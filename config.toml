@@ -7,11 +7,11 @@
 name = "mysql"
 
 [mysql]
-host = "114.55.37.168"
+host = "114.45.36.168"
 user     = "root"
 password = "123456"
-port     = 33306
-database = "db"
+port     = 3306
+database = "db" # database name
 
 [mysql.parameters]
 pool_size = 5

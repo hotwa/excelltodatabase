@@ -28,7 +28,7 @@ except (ModuleNotFoundError,ImportError):
 try:
     filename = sys.argv[1]
 except:
-    filename = './v3_20210330remove_empty.xlsx'
+    filename = './test.xlsx'
 path = os.getcwd()# get absolute path
 excellfile = os.path.join(path, filename.replace('./',''))
 
@@ -141,7 +141,7 @@ def last_handle(i):
 def get_all_data(xlsx:object,line_counts:int)->list:
     __xlsx_all_data_list = []
     for i in range(line_counts)[1:]: # 跳过第一行labels
-        _l = xlsx.read_row(i,read_cell_picture=True,base64c=True,pic_column=['E','G','K'])
+        _l = xlsx.read_row(i,read_cell_picture=True,base64c=True,pic_column=['E'])
         if _l: __l = clear_line_data(_l)
         __xlsx_all_data_list.append(__l)
     return __xlsx_all_data_list
@@ -153,115 +153,6 @@ def clear_line_data(a):
     a_start.append(a_last_str)
     a = [i if i else 'empty' for i in a_start]
     return a
-
-def main1():
-    # 原始数据强制上传，不顾及合理性与规范性单表
-    print(f'导入数据库{excellfile}')
-    xlsx = xlsx_base(excellfile)
-    cinfos = xlsx.xlsx_sheets_info # 显示当前文件结构
-    # 0. 初始化数据 生成
-    dict_all = {
-        cinfos[0][1] : { # key 作为表名和类名
-            'Id' : Column(Integer, primary_key=True),
-            # 特殊的类型放在labels上，此处之下，无需在labels在次传入
-            'labels' : [] # 从xlsx中读取
-        }
-    }
-    # 1.从excell读取labels 存入dict
-    ic(xlsx.current_sheet_num) # 当前选中表的导入
-    for li in cinfos:
-        xlsx.current_sheet_name = li[1]
-        l = xlsx.read_sheet_lable()
-        dict_all[li[1]]['labels'] = l
-    # 1.1 对labels 指定特定的sqlalchemy特定类型(元组) # ! 单表处理
-    labl = dict_all[cinfos[0][1]]['labels']
-    # for i,j in enumerate(labl):
-    #     if j == 'Warhead':
-    #         labl[i] = (j,'LargeBinary')
-    #     if j == 'Mechanism_or_End_product':
-    #         labl[i] = (j,'LargeBinary')
-    #     if j == 'Leaving_Group2':
-    #         labl[i] = (j,'LargeBinary')
-    dict_all[cinfos[0][1]]['labels'] = labl
-    # 2.创建多重联结表的module类，以字典返回 需要几个类可自己创建几个按照顺序创建，先创建低级表
-    mudule_class = muti.create_muti_moduleclass(**dict_all)
-    # ic(dict_all)
-    # 3.创建数据表
-    Localengine = create_engine(database_path, encoding="utf-8", echo=True)
-    # 根据类一个创建table
-    # for k,v in mudule_class.items():
-        # v.metadata.create_all(bind=Localengine, checkfirst=True)
-    # 一次性创建所有列表
-    create_tables(engine=Localengine)
-    # 4.插入数据
-    dbinsert = database_forwards(database_path)
-    # 4.1 创建类 
-    mudule_class = muti.create_muti_moduleclass(**dict_all) # 创建module类 # ! 返回的是字典key为表名例如Sheet1，对应value是创建的相应对象
-    cclass = mudule_class[li[1]] # 得到创建的mapping类对象
-    # 4.2 读取xlsx中的行数据
-    info = xlsx.xlsx_sheets_info
-    # insert_list = []
-    insert_list_all= []
-    xlsx_data_list = []
-    for i in range(info[0][2]):
-        lll = xlsx.read_row(row_num = i + 1,read_cell_picture=True,pic_column=['E','G','K'],base64c=True)
-        if lll:
-            # 处理最后一坨数据
-            num_index = l.index('Example_Pro_DOI_PDB') # 获取合并cell初始位置
-            lab = lll[:num_index]
-            la = lll[num_index:] # slice [example] all cells
-            lal = [str(i).replace('\n', '|') for i in la if i] # 回车处理严禁单元格出现\n异常处理机器麻烦
-            example_data=';'.join(lal)
-            lab.append(example_data)
-            insert_list_all.append(lab)
-        pre_string = 'cclass(Id = {}'
-        l=[i[0] if isinstance(i,tuple) else i for i in l]
-        no_data_sentence =  add_braces(labels=l,string = pre_string)
-        # print(no_data_sentence,'11')
-        # 4.3 将行数据创建至类实例并插入至总列表
-        oneline_data = lab
-        oneline_data = ['"'+str(i)+'"' for i in oneline_data]
-        s_t = create_eval_stentence(no_data_sentence,i,oneline_data)
-        # dbinsert.insert(eval(s_t))# 单条插入
-        xlsx_data_list.append(eval(s_t))
-    insert_data_to_db(dbinsert,xlsx_data_list)
-
-def main2():
-    # ! 原始拆分郑强整理的Example数据，将其整理为两个表，多表模式，放弃，后期有需要在继续编写本函数
-    xlsx = xlsx_base(excellfile)
-    # 高级模式
-    # 0. 初始化数据 生成
-    dict_all = {
-        'warhead' : { # key 作为表名和类名
-            'Id' : Column(Integer, primary_key=True),
-            # 特殊的类型放在labels上，此处之下，无需在labels在次传入
-            'labels' : [] # 从xlsx中读取
-        },
-        'paperlist' : {
-            'Id' : Column(Integer, primary_key=True),
-            'Warhead_id' : Column(Integer, ForeignKey('warhead.Id')), # 外键关联到warhead的Id上
-            'warhead' : relationship('warhead',backref='paper_of_warhead'), #允许你可以在paperlist表里通过paper_of_warhead字段反查warhead所有数据
-            'labels' : [] # 从xlsx中读取
-        }
-    }
-    # 1.从excell读取labels 存入dict
-    cinfos = xlsx.xlsx_sheets_info # 显示当前文件结构
-    ic(xlsx.current_sheet_num) # 当前选中表的导入
-    for li in cinfos:
-        xlsx.current_sheet_name = li[1]
-        l = xlsx.read_sheet_lable()
-        dict_all[li[1]]['labels'] = l
-    # 2.创建多重联结表的module类，以字典返回 需要几个类可自己创建几个按照顺序创建，先创建低级表
-    mudule_class = muti.create_muti_moduleclass(**dict_all)
-    # ic(dict_all)
-    # 3.创建数据表
-    Localengine = create_engine(database_path, encoding="utf-8", echo=True)
-    # 根据类一个创建table
-    # for k,v in mudule_class.items():
-    #     v.metadata.create_all(bind=Localengine, checkfirst=True)
-    # 一次性创建所有列表
-    create_tables(engine=Localengine)
-    # 4.写入数据库
     
 
 # the script entry
@@ -287,18 +178,11 @@ if __name__ == '__main__':
     # 1.1 对labels 指定特定的sqlalchemy特定类型(元组) # ! 单表处理
     labl = dict_all[cinfos[0][1]]['labels']
     for i,j in enumerate(labl): # 对特殊的列含有图片使用长文本进行导入，其余则使用默认string(255)
-        if j == 'Warhead':
+        if j == 'Photo':
             labl[i] = (j,'LONGTEXT')
-        if j == 'Mechanism_or_End_product':
-            labl[i] = (j,'LONGTEXT')
-        if j == 'Leaving_Group2':
-            labl[i] = (j,'LONGTEXT')
-        if j == 'Example_Pro_DOI_PDB':
-            labl[i] = (j,'TEXT')
     dict_all[cinfos[0][1]]['labels'] = labl
     # 2.创建多重联结表的module类，以字典返回 需要几个类可自己创建几个按照顺序创建，先创建低级表
     mudule_class = muti.create_muti_moduleclass(**dict_all) # 创建module类 # ! 返回的是字典key为表名例如Sheet1，对应value是创建的相应对象
-    # ic(dict_all)
     # 3.创建数据表
     Localengine = create_engine(database_path, encoding="utf-8", echo=True)
     # 根据类一个创建table
@@ -315,7 +199,7 @@ if __name__ == '__main__':
     # 4.3 数据清洗，规范化并获得所有数据
     all_data = get_all_data(xlsx,cinfos[0][2]+1) # +1 读取最后一行数据
     # 4.2.1 写入单行数据
-    # exa=cclass(Id=3,Number=a[0],Reversible=a[1],Residue=a[2],Leaving_Group1=a[3],Warhead=a[4],Name=a[5],Leaving_Group2=a[6],SMILES=a[7],Bonding_ID=a[8],SMARTS_match_note=a[9],Mechanism_or_End_product=a[10],Example_Pro_DOI_PDB=a[11])
+    # exa=cclass(Id=2,Number=a[0],Gender=a[1],City=a[2],Name=a[3],Photo=a[4],Events=a[5])
     # dbinsert.insert(exa) # 单条插入
     # 5 多条数据写入
     obj_all_list = []
@@ -323,7 +207,7 @@ if __name__ == '__main__':
     for num in range(len(all_data))[1:]:
         a = all_data[num]
         # print(f'{num}数据{a}')
-        exa=cclass(Id=num,Number=a[0],Reversible=a[1],Residue=a[2],Leaving_Group1=a[3],Warhead=a[4],Name=a[5],Leaving_Group2=a[6],SMILES=a[7],Bonding_ID=a[8],SMARTS_match_note=a[9],Mechanism_or_End_product=a[10],Example_Pro_DOI_PDB=a[11])
+        exa=cclass(Id=num,Number=a[0],Gender=a[1],City=a[2],Name=a[3],Photo=a[4],Events=a[5]) # 此处需要根据第一行labels修改相应属性
         # dbinsert.insert(exa)
         obj_all_list.append(exa)
     dbinsert.insert_muti(obj_all_list) # 多条插入
