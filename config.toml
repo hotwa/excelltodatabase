@@ -1,0 +1,18 @@
+# 使用前务必确认配置正确，并提前创建好mysql数据库
+# Make sure that the configuration is correct and the MySQL database is created in advance.
+
+
+[database]
+# 默认使用sqlite3作为本地数据库，可以选择其他数据库mysql(已测试)
+name = "mysql"
+
+[mysql]
+host = "114.55.37.168"
+user     = "root"
+password = "123456"
+port     = 33306
+database = "db"
+
+[mysql.parameters]
+pool_size = 5
+charset   = "utf-8"
