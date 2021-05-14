@@ -111,7 +111,6 @@ def create_eval_stentence(sentence,id,label_list: dict(help="a row data")):
     # print(sentence.format(id,*label_list))
     return sentence.format(id,*label_list)
 
-# "Id", "Number", "Reversible    Y/N", "Name", "Residue", "Leaving Group", "SMILES", "Binding ID", "Example"
 def add_braces(labels,string):
     # add_string = ',{}={}'
     for i in labels:
